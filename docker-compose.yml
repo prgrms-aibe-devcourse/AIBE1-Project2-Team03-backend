@@ -1,0 +1,41 @@
+services:
+  teamo:  # 서비스 이름을 컨테이너 이름과 일치시킴
+    image: hosiki/teamo:latest
+    container_name: teamo
+    expose:
+      - "8080"
+    networks:
+      - backend
+    restart: always
+    env_file:
+      - ./.env  # 환경 변수를 .env 파일에서 로드
+
+  nginx-proxy:  # 서비스 이름을 컨테이너 이름과 일치시킴
+    image: nginx:latest
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/certbot:/etc/letsencrypt
+      - ./nginx/www:/var/www/certbot
+    depends_on:
+      - teamo  # 의존성 이름 변경
+    networks:
+      - backend
+    restart: always
+    command: /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./nginx/certbot:/etc/letsencrypt
+      - ./nginx/www:/var/www/certbot
+    networks:
+      - backend
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+networks:
+  backend:
